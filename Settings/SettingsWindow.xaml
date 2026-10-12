@@ -1,0 +1,130 @@
+<Window x:Class="AutoInputTester.Settings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Auto Input Tester – Einstellungen"
+        Width="680" Height="940"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18">
+            <GroupBox Header="Eingabe" Margin="0,0,0,12">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Anschläge / 10 Minuten" VerticalAlignment="Center"/>
+                    <TextBox x:Name="StrokesBox" Grid.Row="0" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="1" Text="Geschwindigkeitsschwankung (%)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="VariationBox" Grid.Row="1" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="Startverzögerung nach Hotkey (ms)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="StartDelayBox" Grid.Row="2" Grid.Column="1" Margin="8,4"/>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Fehler" Margin="0,0,0,12">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Fehlerquote (%)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="ErrorBox" Grid.Row="0" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="1" Text="Mindestabstand (Zeichen)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="GapBox" Grid.Row="1" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="Korrekturmodus" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="CorrectionCombo" Grid.Row="2" Grid.Column="1" Margin="8,4">
+                        <ComboBoxItem Content="Test-/Trainerfeld: falsch → richtig, kein Backspace" Tag="NoBackspace"/>
+                        <ComboBoxItem Content="Normales Textfeld: falsch → Backspace → richtig" Tag="Backspace"/>
+                    </ComboBox>
+                    <CheckBox x:Name="EarlyErrorsCheck" Grid.Row="3" Grid.ColumnSpan="2" Content="Fehler eher im ersten Teil des Textes verteilen" Margin="0,6"/>
+                    <CheckBox x:Name="ErrorsOnSpacesCheck" Grid.Row="4" Grid.ColumnSpan="2" Content="Auch Leerzeichen als mögliche Fehlerposition zulassen" Margin="0,6"/>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="OCR" Margin="0,0,0,12">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Sprache" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LanguageBox" Grid.Row="0" Grid.Column="1" Margin="8,4" ToolTip="z. B. de-DE"/>
+                    <TextBlock Grid.Row="1" Text="Erkennungsmodus" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="OcrModeCombo" Grid.Row="1" Grid.Column="1" Margin="8,4">
+                        <ComboBoxItem Content="Nur schwarzer / noch nicht geschriebener Text" Tag="BlackTextOnly"/>
+                        <ComboBoxItem Content="Gesamter ausgewählter Bereich" Tag="WholeSelection"/>
+                        <ComboBoxItem Content="Nur rechts vom Cursor" Tag="RightOfCaret"/>
+                    </ComboBox>
+                    <CheckBox x:Name="SpacesCheck" Grid.Row="2" Grid.ColumnSpan="2" Content="Leerzeichen übernehmen" Margin="0,6"/>
+                    <CheckBox x:Name="LineBreaksCheck" Grid.Row="3" Grid.ColumnSpan="2" Content="Zeilenumbrüche als Enter übernehmen" Margin="0,6"/>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Fortlaufender Text / Live OCR" Margin="0,0,0,12">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <CheckBox x:Name="LiveOcrCheck" Grid.Row="0" Grid.ColumnSpan="2"
+                              Content="Live OCR aktiv – neu erscheinenden Text automatisch nachladen" Margin="0,4,0,8"/>
+                    <TextBlock Grid.Row="1" Text="Nachladen ab Restpuffer (Zeichen)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LivePrefetchBox" Grid.Row="1" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="OCR-Abfrageintervall (ms)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LivePollBox" Grid.Row="2" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="3" Text="Leere Scans bis 'Fertig'" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LiveEmptyScansBox" Grid.Row="3" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="V6 liest den markierten Bereich während des Tippens erneut. Bereits bekannte Zeichen werden überlappend abgeglichen; nur neu rechts auftauchender Text wird angehängt."/>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Hotkeys" Margin="0,0,0,12">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Bereich auswählen" VerticalAlignment="Center"/>
+                    <TextBox x:Name="SelectHotkeyBox" Grid.Row="0" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="1" Text="Start" VerticalAlignment="Center"/>
+                    <TextBox x:Name="StartHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="Pause / Fortsetzen" VerticalAlignment="Center"/>
+                    <TextBox x:Name="PauseHotkeyBox" Grid.Row="2" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="3" Text="Not-Stopp" VerticalAlignment="Center"/>
+                    <TextBox x:Name="StopHotkeyBox" Grid.Row="3" Grid.Column="1" Margin="8,4"/>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Fokus / Testlauf" Margin="0,0,0,12">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Random Seed (0 = zufällig)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="SeedBox" Grid.Row="0" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="1" Text="Wenn Zielfenster Fokus verliert" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="FocusModeCombo" Grid.Row="1" Grid.Column="1" Margin="8,4">
+                        <ComboBoxItem Content="Fokus automatisch zurückholen" Tag="Restore"/>
+                        <ComboBoxItem Content="Test sofort stoppen" Tag="Stop"/>
+                        <ComboBoxItem Content="Ignorieren" Tag="Ignore"/>
+                    </ComboBox>
+                    <TextBlock Grid.Row="2" Text="Fokus-Wiederherstellung Timeout (ms)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="FocusTimeoutBox" Grid.Row="2" Grid.Column="1" Margin="8,4"/>
+                </Grid>
+            </GroupBox>
+
+            <TextBlock Margin="2,0,2,12" TextWrapping="Wrap"
+                       Text="Empfohlen für deine laufende Zeile: Live OCR AN, OCR-Modus 'nur schwarzer Text', Restpuffer 45, Intervall 220 ms, 10 leere Scans."/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Abbrechen" Width="100" Margin="4" IsCancel="True"/>
+                <Button Content="Speichern" Width="100" Margin="4" IsDefault="True" Click="Save_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Auto Input Tester – KeyboardEvent Diagnose</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:1000px;margin:32px auto;padding:0 18px}
+#target{width:100%;font-size:22px;padding:14px;box-sizing:border-box}
+pre{background:#111;color:#eee;padding:14px;min-height:220px;white-space:pre-wrap;overflow:auto}
+button{padding:8px 14px}
+</style>
+</head>
+<body>
+<h1>KeyboardEvent Diagnose</h1>
+<p>In das Feld klicken und den Auto Input Tester starten. Unten werden die empfangenen KeyboardEvents angezeigt.</p>
+<textarea id="target" rows="5" placeholder="Hier testen …"></textarea>
+<p><button id="clear">Log leeren</button></p>
+<pre id="log"></pre>
+<script>
+const target=document.getElementById('target');
+const log=document.getElementById('log');
+for (const type of ['keydown','keyup']) {
+  target.addEventListener(type, e => {
+    log.textContent += `${type.padEnd(7)} key=${JSON.stringify(e.key)} code=${e.code} keyCode=${e.keyCode} which=${e.which} repeat=${e.repeat}\n`;
+    log.scrollTop=log.scrollHeight;
+  });
+}
+document.getElementById('clear').onclick=()=>log.textContent='';
+</script>
+</body>
+</html>

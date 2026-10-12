@@ -1,0 +1,31 @@
+<Window x:Class="AutoInputTester.Overlay.SelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
+        Cursor="Cross" KeyDown="Window_KeyDown"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseMove="Window_MouseMove"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp">
+    <Canvas x:Name="Root">
+        <Rectangle x:Name="ShadeTop" Fill="#66000000"/>
+        <Rectangle x:Name="ShadeLeft" Fill="#66000000"/>
+        <Rectangle x:Name="ShadeRight" Fill="#66000000"/>
+        <Rectangle x:Name="ShadeBottom" Fill="#66000000"/>
+
+        <Border x:Name="SelectionBorder" BorderBrush="White" BorderThickness="2" Background="#08000000" Visibility="Collapsed">
+            <TextBlock Text="Ziehen: verschieben   •   Griffe: Größe   •   Enter: übernehmen   •   Esc: abbrechen"
+                       Background="#CC111111" Foreground="White" Padding="8,4"
+                       HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="12"/>
+        </Border>
+
+        <Rectangle x:Name="HandleNW" Width="10" Height="10" Fill="White" Stroke="Black" Tag="NW" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleN" Width="10" Height="10" Fill="White" Stroke="Black" Tag="N" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleNE" Width="10" Height="10" Fill="White" Stroke="Black" Tag="NE" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleE" Width="10" Height="10" Fill="White" Stroke="Black" Tag="E" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleSE" Width="10" Height="10" Fill="White" Stroke="Black" Tag="SE" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleS" Width="10" Height="10" Fill="White" Stroke="Black" Tag="S" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleSW" Width="10" Height="10" Fill="White" Stroke="Black" Tag="SW" Visibility="Collapsed"/>
+        <Rectangle x:Name="HandleW" Width="10" Height="10" Fill="White" Stroke="Black" Tag="W" Visibility="Collapsed"/>
+    </Canvas>
+</Window>

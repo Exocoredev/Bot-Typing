@@ -1,0 +1,91 @@
+# Build outputs (contain absolute local paths)
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+*.vspscc
+*.vssscc
+.builds
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+*.DotSettings.user
+*.ncrunch*
+.*crunch*.local.xml
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+
+# Local / personal runtime data (never commit)
+settings.json
+settings.json.bak
+*.bak
+Logs/
+logs/
+*.log
+AppData/
+LocalAppData/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+
+# Secrets / credentials (safety net)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+credentials.json
+secrets.json
+appsettings.*.local.json
+
+# Old nested duplicate copies / share leftovers
+AutoInputTester_FIXED_V6/
+*_SHARE.zip
+*.zip
+
+# Test / temp
+TestResults/
+[Tt]emp/
+[Tt]mp/
+*.tmp
+*.temp

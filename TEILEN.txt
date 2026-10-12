@@ -1,0 +1,39 @@
+Auto Input Tester V6 – Ordner weitergeben
+========================================
+
+Variante A (einfachste): Nur die fertige EXE teilen
+---------------------------------------------------
+1. Bei dir: build.bat starten
+2. Weitergeben: Datei
+   publish\AutoInputTester.exe
+3. Auf dem anderen PC: EXE starten (kein Build noetig)
+
+
+Variante B: Quellcode-Ordner teilen (Build auf anderem PC)
+---------------------------------------------------------
+Voraussetzung auf dem anderen PC:
+- Windows 10/11 x64
+- .NET 8 SDK:
+  https://dotnet.microsoft.com/download/dotnet/8.0
+  (Installer: "SDK 8.x" fuer Windows x64)
+
+So packen:
+1. build.bat einmal ausfuehren ODER vorher loeschen:
+   - Ordner bin\
+   - Ordner obj\
+   - Ordner publish\
+   - falls vorhanden: Ordner AutoInputTester_FIXED_V6\  (alte Doppelkopie!)
+2. Diesen Projektordner kopieren/zippen
+3. Auf dem anderen PC entpacken
+4. build.bat starten
+5. Fertige EXE liegt unter publish\AutoInputTester.exe
+
+
+Wenn der Build fehlschlaegt
+---------------------------
+- Meldung "dotnet wurde nicht gefunden" / ".NET 8 SDK":
+  SDK installieren, PC ggf. neu starten, build.bat erneut.
+- Viele Fehler "enthaelt bereits eine Definition" (CS0101):
+  Ordner AutoInputTester_FIXED_V6\ im Projekt loeschen, dann build.bat.
+- OneDrive "Nur online":
+  Ordner zuerst "Immer behalten auf diesem Gerät".
