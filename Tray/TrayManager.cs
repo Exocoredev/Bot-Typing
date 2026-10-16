@@ -8,6 +8,10 @@ public sealed class TrayManager : IDisposable
     private readonly NotifyIcon _icon;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
+    private readonly Icon _defaultIcon;
+    private readonly Icon _cameraIcon;
+    private bool _keyboardLocked;
+    private string _statusText = "Bereit";
 
     public event Action? SelectAreaRequested;
     public event Action? PreviewRequested;
@@ -20,6 +24,9 @@ public sealed class TrayManager : IDisposable
 
     public TrayManager()
     {
+        _defaultIcon = TrayIcons.CreateDefault();
+        _cameraIcon = TrayIcons.CreateCameraOn();
+
         _menu = new ContextMenuStrip();
         _statusItem = new ToolStripMenuItem("Status: Bereit") { Enabled = false };
         _menu.Items.Add(_statusItem);
@@ -39,7 +46,7 @@ public sealed class TrayManager : IDisposable
         _icon = new NotifyIcon
         {
             Text = "Auto Input Tester",
-            Icon = SystemIcons.Application,
+            Icon = _defaultIcon,
             ContextMenuStrip = _menu,
             Visible = true
         };
@@ -48,15 +55,34 @@ public sealed class TrayManager : IDisposable
 
     public void SetStatus(string text)
     {
-        _statusItem.Text = $"Status: {text}";
-        var tooltip = $"Auto Input Tester - {text}";
+        _statusText = text;
+        RefreshVisual();
+    }
+
+    public void SetKeyboardLocked(bool locked)
+    {
+        _keyboardLocked = locked;
+        RefreshVisual();
+    }
+
+    private void RefreshVisual()
+    {
+        var status = _keyboardLocked
+            ? $"Kamera AN – Tastatur gesperrt | {_statusText}"
+            : _statusText;
+
+        _statusItem.Text = $"Status: {status}";
+        _icon.Icon = _keyboardLocked ? _cameraIcon : _defaultIcon;
+        var tooltip = _keyboardLocked
+            ? $"Kamera AN – Sperre aktiv – {_statusText}"
+            : $"Auto Input Tester - {_statusText}";
         _icon.Text = tooltip.Length > 63 ? tooltip[..63] : tooltip;
     }
 
     public void ShowBalloon(string title, string message, ToolTipIcon icon = ToolTipIcon.Info)
     {
         _icon.BalloonTipTitle = title;
-        _icon.BalloonTipText = message;
+        _icon.BalloonTipText = message.Length > 250 ? message[..250] : message;
         _icon.BalloonTipIcon = icon;
         _icon.ShowBalloonTip(2500);
     }
@@ -67,5 +93,7 @@ public sealed class TrayManager : IDisposable
         _icon.ContextMenuStrip = null;
         _icon.Dispose();
         _menu.Dispose();
+        _defaultIcon.Dispose();
+        _cameraIcon.Dispose();
     }
 }

@@ -1,66 +1,43 @@
-# Auto Input Tester V6
+# Bot-Typing (Auto Input Tester V6)
 
-V6 behebt den Fehler, dass V5 nach dem einmalig erkannten sichtbaren Text "Fertig" meldete.
+Tippt Übungstexte auf **edu.typewriter.at** (Typewriter EDU). Primär über **Browser-DOM** (exakt), OCR nur als Fallback.
 
-## Neu in V6
+## Schnellstart (ohne Build)
 
-- **Live OCR waehrend des Tippens**
-- neu rechts auftauchender / nachscrollender Text wird automatisch nachgeladen
-- OCR laeuft im Hintergrund und soll den Browserfokus nicht wegnehmen
-- bereits bekannte Zeichen werden ueber einen Text-Overlap abgeglichen
-- nur der neu erschienene Teil wird an den internen Puffer angehaengt
-- wenn der Puffer leer wird, wartet V6 auf weitere OCR-Daten statt sofort zu stoppen
-- erst nach mehreren leeren Scans wird wirklich "Fertig" gemeldet
-- Live-OCR Werte sind in den Einstellungen anpassbar
-- Log enthaelt OCR-Durchlaeufe, nachgeladene Zeichen und Ausrichtungsfehler
+1. `starten-edge-typewriter.bat` **oder** `starten-chrome-typewriter.bat`
+2. Auf edu.typewriter.at einloggen und Lektion starten
+3. `publish\AutoInputTester.exe` starten (vorher `build.bat` / `fertigen-zum-teilen.bat`)
+4. Browser fokussieren → **Ctrl+Shift+F9** starten → **Ctrl+Shift+F11** stoppen
+
+Siehe auch `SO-STARTEN.txt` und `TEILEN.txt`.
+
+Fertiges Paket für andere PCs (kein .NET nötig): `fertigen-zum-teilen.bat`
 
 ## Bauen
 
-1. ZIP entpacken (siehe auch `TEILEN.txt`).
-2. Auf dem Ziel-PC muss das **.NET 8 SDK** installiert sein.
-3. Optional einmal `reset_settings.bat` starten, damit keine alten V5-Einstellungen stoeren.
-4. `build.bat` starten.
-5. Danach liegt die EXE unter:
+Voraussetzung: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (Windows x64)
 
-`publish\AutoInputTester.exe`
+```bat
+build.bat
+```
 
-Zum Weitergeben am einfachsten: `packen-zum-teilen.bat` ausfuehren
-oder nur `publish\AutoInputTester.exe` kopieren (kein Build auf dem anderen PC).
+EXE: `publish\AutoInputTester.exe` (self-contained, läuft auf frischen PCs ohne SDK)
 
-## Empfohlene Einstellungen fuer eine laufende Typewriter-artige Zeile
+## Hotkeys (Standard)
 
-- Live OCR: **AN**
-- OCR-Modus: **Nur schwarzer / noch nicht geschriebener Text**
-- Restpuffer: **45 Zeichen**
-- OCR-Abfrageintervall: **220 ms**
-- Leere Scans bis Fertig: **10**
-- Leerzeichen: **AN**
-- Zeilenumbrueche: **AUS**
-- Fokusverlust: **Fokus automatisch zurueckholen**
+| Aktion | Hotkey |
+|--------|--------|
+| Bereich (OCR-Fallback) | Ctrl+Shift+S |
+| Start | Ctrl+Shift+F9 |
+| Pause | Ctrl+Shift+F10 |
+| Stop | Ctrl+Shift+F11 |
 
-## Ablauf
+## Hinweise
 
-1. `AutoInputTester.exe` starten. Sie liegt nur im Tray.
-2. `Ctrl+Shift+S` druecken.
-3. Den Bereich markieren, in dem die laufende Textzeile sichtbar ist. Der Bereich sollte breit genug sein, damit rechts immer neuer Text sichtbar wird.
-4. OCR-Vorschau kontrollieren und uebernehmen.
-5. Im Zielfenster die eigentliche Aufgabe starten / das Eingabefeld aktivieren.
-6. `Ctrl+Shift+F9` **einmal** druecken und komplett loslassen.
-7. V6 liest direkt vor dem Tippen den Bereich nochmals still ein und tippt los.
-8. Wenn Text nach rechts nachgeladen wird, liest V6 ihn automatisch nach.
-9. `Ctrl+Shift+F10` = Pause / Fortsetzen.
-10. `Ctrl+Alt+Esc` = sofort stoppen.
+- Browser **nur über die .bat** starten (Debugging-Port 9222)
+- Edge und Chrome nicht gleichzeitig mit der .bat nutzen
+- Persönliche Settings/Logs liegen lokal unter `%LocalAppData%\AutoInputTester` und sind **nicht** im Repo
 
-## Erster Test
+## Lizenz
 
-Zum Testen zuerst:
-
-- Fehlerquote: `0 %`
-- Schwankung: `0 %`
-- Live OCR: `AN`
-
-Wenn das Durchlaufen der kompletten Aufgabe funktioniert, Fehler und Schwankung wieder aktivieren.
-
-## Wichtig
-
-Im Live-Modus wird die OCR-Vorschau beim Start **nicht blind weiterverwendet**. V6 macht beim Start eine frische, unsichtbare OCR-Aufnahme des gespeicherten Bereichs. Dadurch wird kein alter Text getippt, wenn sich die Webseite zwischen Auswahl und Start veraendert hat.
+MIT – siehe `LICENSE`

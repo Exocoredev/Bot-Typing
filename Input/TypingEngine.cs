@@ -1,4 +1,5 @@
 using System.Text;
+using AutoInputTester.Dom;
 using AutoInputTester.Hotkeys;
 using AutoInputTester.Models;
 using AutoInputTester.Native;
@@ -18,6 +19,7 @@ public sealed class TypingEngine
     public bool IsPaused => _paused;
 
     public event Action<int, int, int>? ProgressChanged;
+    public event Action<string>? StatusChanged;
 
     public TypingEngine(TargetWindowService targetService)
     {
@@ -66,6 +68,10 @@ public sealed class TypingEngine
         var lastErrorIndex = -1;
         HashSet<int>? staticErrorPlan = null;
 
+        // Only truly empty OCR scans may finish a live run. Never finish because
+        // merge/alignment failed while text is still visible.
+        var emptyScansToFinish = Math.Clamp(settings.LiveOcrEmptyScansToFinish, 15, 100);
+
         var report = new TestRunReport
         {
             StartedAt = DateTime.Now,
@@ -83,7 +89,6 @@ public sealed class TypingEngine
 
         try
         {
-            // Ctrl/Shift/F9 must be released before any synthetic key is sent.
             await _releaseGuard.WaitForHotkeyReleaseAsync(settings.StartHotkey, token);
 
             if (!await PrepareTargetAsync(targetWindow, settings, report, token))
@@ -97,16 +102,18 @@ public sealed class TypingEngine
 
             var keyboardLayout = _keyboard.GetKeyboardLayoutForWindow(targetWindow);
 
-            // Live mode always begins with one silent fresh OCR read. No dialog is
-            // opened, so the target window keeps focus. This prevents a stale OCR
-            // preview from being typed after the page has already changed.
             if (liveReader is not null)
             {
-                var freshStart = await liveReader(token);
+                StatusChanged?.Invoke("Text Startlesung …");
+                var startRead = await AwaitOcrAsync(liveReader, token);
                 report.LiveOcrRefreshes++;
                 knownText.Clear();
-                if (!string.IsNullOrEmpty(freshStart))
-                    knownText.Append(freshStart);
+                if (!startRead.TimedOut && !string.IsNullOrEmpty(startRead.Text))
+                {
+                    var startText = startRead.Text;
+                    LiveTextMarkers.TryUnmarkDomRemaining(ref startText);
+                    knownText.Append(startText);
+                }
                 report.TargetCharacters = knownText.Length;
             }
 
@@ -120,46 +127,48 @@ public sealed class TypingEngine
             {
                 token.ThrowIfCancellationRequested();
                 await WaitWhilePausedAsync(token);
+                // After L+R Shift (lock) or manual keys: wait briefly, then continue automatically.
                 await _releaseGuard.WaitForUserModifiersReleasedAsync(token);
 
-                // Apply a background OCR result as soon as it is ready. Typing does
-                // not wait for OCR while there are still buffered characters.
                 if (refresh is not null && refresh.Task.IsCompleted)
                 {
-                    var fresh = await refresh.Task;
+                    var read = await AwaitCompletedOcrAsync(refresh.Task, token);
                     report.LiveOcrRefreshes++;
-                    ApplyLiveRefresh(
-                        refresh,
-                        fresh,
-                        knownText,
-                        position,
-                        report,
-                        ref emptyScans,
-                        ref stableCandidate,
-                        ref stableCandidateCount);
+                    if (!read.TimedOut)
+                    {
+                        ApplyLiveRefresh(
+                            refresh,
+                            read.Text,
+                            knownText,
+                            position,
+                            report,
+                            ref emptyScans,
+                            ref stableCandidate,
+                            ref stableCandidateCount);
+                    }
                     refresh = null;
                     nextRefreshAllowedAt = Environment.TickCount64 + settings.LiveOcrPollIntervalMilliseconds;
                 }
 
                 var remaining = Math.Max(0, knownText.Length - position);
 
-                // Start a non-blocking prefetch BEFORE the known text is exhausted.
-                // The anchor lets us append only text that is genuinely new.
                 if (liveReader is not null &&
                     refresh is null &&
                     remaining <= settings.LiveOcrPrefetchCharacters &&
                     Environment.TickCount64 >= nextRefreshAllowedAt)
                 {
-                    var anchor = remaining > 0 ? knownText.ToString(position, remaining) : string.Empty;
+                    var anchor = remaining > 0
+                        ? knownText.ToString(position, remaining)
+                        : string.Empty;
                     refresh = new LiveRefreshRequest(anchor, liveReader(token));
                 }
 
-                // No buffered character left: wait for Live OCR instead of declaring
-                // the run finished immediately, which was the V5 bug.
                 if (position >= knownText.Length)
                 {
                     if (liveReader is null)
                         break;
+
+                    StatusChanged?.Invoke($"Warte auf neuen Text … (leere Scans {emptyScans}/{emptyScansToFinish})");
 
                     if (refresh is null)
                     {
@@ -167,28 +176,42 @@ public sealed class TypingEngine
                         if (wait > 0)
                             await Task.Delay(Math.Min(wait, settings.LiveOcrPollIntervalMilliseconds), token);
 
+                        // Empty buffer: no typed-suffix anchor. BlackTextOnly usually
+                        // shows only the next untyped chunk — merge against known instead.
                         refresh = new LiveRefreshRequest(string.Empty, liveReader(token));
                     }
 
-                    var fresh = await refresh.Task;
+                    var read = await AwaitOcrTaskAsync(refresh.Task, token);
                     report.LiveOcrRefreshes++;
+                    refresh = null;
+                    nextRefreshAllowedAt = Environment.TickCount64 + settings.LiveOcrPollIntervalMilliseconds;
+
+                    if (read.TimedOut)
+                    {
+                        StatusChanged?.Invoke("OCR langsam – warte weiter (zählt nicht als fertig) …");
+                        await Task.Delay(settings.LiveOcrPollIntervalMilliseconds, token);
+                        continue;
+                    }
+
                     ApplyLiveRefresh(
-                        refresh,
-                        fresh,
+                        new LiveRefreshRequest(string.Empty, Task.FromResult(read.Text)),
+                        read.Text,
                         knownText,
                         position,
                         report,
                         ref emptyScans,
                         ref stableCandidate,
                         ref stableCandidateCount);
-                    refresh = null;
-                    nextRefreshAllowedAt = Environment.TickCount64 + settings.LiveOcrPollIntervalMilliseconds;
 
                     if (position < knownText.Length)
                         continue;
 
-                    if (emptyScans >= settings.LiveOcrEmptyScansToFinish)
+                    if (emptyScans >= emptyScansToFinish)
+                    {
+                        report.StopReason =
+                            $"Completed: {emptyScans} wirklich leere OCR-Scans (kein sichtbarer Text mehr)";
                         break;
+                    }
 
                     await Task.Delay(settings.LiveOcrPollIntervalMilliseconds, token);
                     continue;
@@ -201,18 +224,19 @@ public sealed class TypingEngine
                 }
 
                 var correct = knownText[position];
-                var makeError = liveReader is null
-                    ? false
-                    : planner.ShouldMakeStreamingError(correct, position, settings, random, ref lastErrorIndex);
-
-                // Static mode keeps its exact pre-planned percentage behavior.
-                // Build the plan lazily only once when Live OCR is disabled.
-                if (liveReader is null)
+                var makeError = false;
+                // Treat tiny float leftovers as zero — intentional typos must stay off.
+                if (settings.ErrorPercent >= 0.05)
                 {
-                    // For the static path the old planner is exact and deterministic.
-                    // It is created once and cached in this local variable below.
-                    staticErrorPlan ??= planner.Plan(knownText.ToString(), settings, random);
-                    makeError = staticErrorPlan.Contains(position);
+                    makeError = liveReader is null
+                        ? false
+                        : planner.ShouldMakeStreamingError(correct, position, settings, random, ref lastErrorIndex);
+
+                    if (liveReader is null)
+                    {
+                        staticErrorPlan ??= planner.Plan(knownText.ToString(), settings, random);
+                        makeError = staticErrorPlan.Contains(position);
+                    }
                 }
 
                 if (makeError)
@@ -275,7 +299,6 @@ public sealed class TypingEngine
         }
         catch (Exception ex)
         {
-            // Keep the report so AppController can still persist diagnostics.
             report.StopReason = "Error: " + ex.Message;
         }
         finally
@@ -293,6 +316,25 @@ public sealed class TypingEngine
         return report;
     }
 
+    private readonly record struct OcrRead(string Text, bool TimedOut);
+
+    private static async Task<OcrRead> AwaitOcrAsync(Func<CancellationToken, Task<string>> liveReader, CancellationToken token)
+        => await AwaitOcrTaskAsync(liveReader(token), token);
+
+    private static async Task<OcrRead> AwaitCompletedOcrAsync(Task<string> task, CancellationToken token)
+        => await AwaitOcrTaskAsync(task, token);
+
+    private static async Task<OcrRead> AwaitOcrTaskAsync(Task<string> task, CancellationToken token)
+    {
+        var delay = Task.Delay(4000, token);
+        var finished = await Task.WhenAny(task, delay);
+        if (finished != task)
+            return new OcrRead(string.Empty, TimedOut: true);
+
+        var text = await task;
+        return new OcrRead(text ?? string.Empty, TimedOut: false);
+    }
+
     private static void ApplyLiveRefresh(
         LiveRefreshRequest request,
         string fresh,
@@ -304,6 +346,37 @@ public sealed class TypingEngine
         ref int stableCandidateCount)
     {
         fresh ??= string.Empty;
+
+        // Exact remaining text from browser DOM — replace untyped buffer, no OCR merge.
+        if (LiveTextMarkers.TryUnmarkDomRemaining(ref fresh))
+        {
+            var remaining = Math.Max(0, knownText.Length - position);
+            var previous = remaining > 0 ? knownText.ToString(position, remaining) : string.Empty;
+            var changed = !string.Equals(previous, fresh, StringComparison.Ordinal);
+
+            if (remaining > 0)
+                knownText.Remove(position, remaining);
+
+            if (fresh.Length > 0)
+            {
+                knownText.Append(fresh);
+                report.LiveOcrAppendedCharacters += fresh.Length;
+                report.TargetCharacters = knownText.Length;
+                if (changed) report.LiveOcrResyncs++;
+                emptyScans = 0;
+                stableCandidate = string.Empty;
+                stableCandidateCount = 0;
+            }
+            else if (position >= knownText.Length)
+            {
+                emptyScans++;
+                stableCandidate = string.Empty;
+                stableCandidateCount = 0;
+            }
+
+            return;
+        }
+
         var addition = string.Empty;
         var aligned = false;
         var hadText = fresh.Length > 0;
@@ -317,7 +390,6 @@ public sealed class TypingEngine
         }
         else if (fresh.Length > 0 && knownText.Length > 0)
         {
-            // Empty buffer: never append the full OCR blindly — diff against known text.
             addition = LiveTextMerger.NewTextAfterKnown(knownText.ToString(), fresh);
             aligned = addition.Length > 0
                       || knownText.ToString().Contains(fresh, StringComparison.Ordinal);
@@ -342,15 +414,34 @@ public sealed class TypingEngine
             return;
         }
 
+        // Desync: replace untyped buffer only when OCR length is plausible.
+        if (!aligned && request.Anchor.Length > 0 && hadText && position < knownText.Length)
+        {
+            report.LiveOcrAlignmentMisses++;
+            var remaining = knownText.Length - position;
+            if (remaining >= 3 && fresh.Length >= Math.Max(6, remaining / 2))
+            {
+                knownText.Remove(position, remaining);
+                knownText.Append(fresh);
+                report.LiveOcrResyncs++;
+                report.LiveOcrAppendedCharacters += fresh.Length;
+                report.TargetCharacters = knownText.Length;
+                emptyScans = 0;
+                stableCandidate = string.Empty;
+                stableCandidateCount = 0;
+            }
+
+            return;
+        }
+
         if (!aligned && request.Anchor.Length > 0 && hadText)
             report.LiveOcrAlignmentMisses++;
 
-        // While characters are still buffered, a scan with no extension simply
-        // means that the UI has not revealed enough new text yet.
         if (position < knownText.Length)
             return;
 
-        // Truly empty OCR → count toward finish.
+        // ——— buffer empty ———
+
         if (fresh.Length == 0)
         {
             emptyScans++;
@@ -359,8 +450,6 @@ public sealed class TypingEngine
             return;
         }
 
-        // Non-empty OCR without an addition: wait for a stable hard-scroll candidate.
-        // Do NOT increment emptyScans while stabilizing — that caused early "Fertig".
         if (LiveTextMerger.SameStableCandidate(stableCandidate, fresh))
             stableCandidateCount++;
         else
@@ -372,7 +461,7 @@ public sealed class TypingEngine
         if (stableCandidateCount < 2)
             return;
 
-        if (knownText.Length == 0)
+        if (knownText.Length == 0 || LiveTextMerger.LooksLikeNewViewport(knownText.ToString(), fresh))
         {
             knownText.Append(fresh);
             report.LiveOcrAppendedCharacters += fresh.Length;
@@ -383,20 +472,6 @@ public sealed class TypingEngine
             return;
         }
 
-        // Hard scroll: OCR shows a new viewport with no overlap to known text.
-        if (LiveTextMerger.SharesNoOverlap(knownText.ToString(), fresh))
-        {
-            knownText.Append(fresh);
-            report.LiveOcrAppendedCharacters += fresh.Length;
-            report.TargetCharacters = knownText.Length;
-            emptyScans = 0;
-            stableCandidate = string.Empty;
-            stableCandidateCount = 0;
-            return;
-        }
-
-        // Stable OCR still showing already-known content — treat as idle scan.
-        emptyScans++;
         stableCandidate = string.Empty;
         stableCandidateCount = 0;
     }

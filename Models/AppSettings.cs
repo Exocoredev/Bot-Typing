@@ -22,7 +22,7 @@ public enum FocusMode
 
 public sealed class AppSettings
 {
-    public int SettingsVersion { get; set; } = 6;
+    public int SettingsVersion { get; set; } = 7;
 
     public int StrokesPer10Minutes { get; set; } = 2000;
     public double SpeedVariationPercent { get; set; } = 10.0;
@@ -44,12 +44,18 @@ public sealed class AppSettings
     public bool LiveOcrEnabled { get; set; } = true;
     public int LiveOcrPrefetchCharacters { get; set; } = 45;
     public int LiveOcrPollIntervalMilliseconds { get; set; } = 220;
-    public int LiveOcrEmptyScansToFinish { get; set; } = 10;
+    public int LiveOcrEmptyScansToFinish { get; set; } = 25;
+
+    // V7: Prefer exact exercise text from the browser DOM (Chrome/Edge CDP)
+    // over OCR. Needs --remote-debugging-port=9222 (starten-chrome-typewriter.bat).
+    public bool UseDomTextSource { get; set; } = true;
+    public int DomDebugPort { get; set; } = 9222;
 
     public string SelectHotkey { get; set; } = "Ctrl+Shift+S";
     public string StartHotkey { get; set; } = "Ctrl+Shift+F9";
     public string PauseHotkey { get; set; } = "Ctrl+Shift+F10";
-    public string StopHotkey { get; set; } = "Ctrl+Alt+Escape";
+    // Ctrl+Alt+Escape is often swallowed by other hooks; F11 is reliable.
+    public string StopHotkey { get; set; } = "Ctrl+Shift+F11";
 
     public FocusMode FocusMode { get; set; } = FocusMode.Restore;
     public int FocusRestoreTimeoutMilliseconds { get; set; } = 1500;
@@ -58,4 +64,10 @@ public sealed class AppSettings
     // performs a silent fresh read at the start, without opening any window.
     public bool RefreshOcrOnStart { get; set; } = false;
     public int RandomSeed { get; set; } = 0;
+
+    // UI / notifications — each can be disabled individually.
+    public bool ShowTrayBalloons { get; set; } = true;
+    public bool ShowOcrPreviewWindow { get; set; } = true;
+    public bool ShowErrorDialogs { get; set; } = true;
+    public bool ShowFinishBalloon { get; set; } = true;
 }

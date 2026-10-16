@@ -112,22 +112,35 @@ public static class LiveTextMerger
         if (known.Length == 0 || fresh.Length == 0)
             return true;
 
-        var probe = Math.Min(MinOverlap, Math.Min(known.Length, fresh.Length));
+        // Only treat as "no overlap" when a LONG typed suffix is missing from OCR.
+        // Short probes (4–8 chars) false-positive on common German endings and
+        // then blocked appending of the next BlackTextOnly chunk.
+        var probe = Math.Min(24, known.Length);
+        if (probe < 10)
+            probe = known.Length;
         if (probe <= 0)
             return true;
 
-        for (var len = probe; len >= Math.Min(4, probe); len--)
-        {
-            if (fresh.Contains(known[^len..], StringComparison.Ordinal))
-                return false;
-            if (FindFuzzyLast(fresh, known[^len..], MaxErrorsFor(len)) >= 0)
-                return false;
-            if (known.Contains(fresh[..len], StringComparison.Ordinal))
-                return false;
-        }
+        var suffix = known[^probe..];
+        if (fresh.Contains(suffix, StringComparison.Ordinal))
+            return false;
+        if (FindFuzzyLast(fresh, suffix, MaxErrorsFor(probe)) >= 0)
+            return false;
 
-        return LongestSuffixPrefix(known, fresh) == 0
-               && LongestFuzzySuffixPrefix(known, fresh, MaxErrorsFor(probe)) == 0;
+        return true;
+    }
+
+    /// <summary>
+    /// BlackTextOnly / scrolled viewport: OCR no longer contains the typed suffix,
+    /// so the whole fresh string is the next text to type.
+    /// </summary>
+    public static bool LooksLikeNewViewport(string known, string fresh)
+    {
+        if (string.IsNullOrEmpty(fresh))
+            return false;
+        if (string.IsNullOrEmpty(known))
+            return true;
+        return SharesNoOverlap(known, fresh);
     }
 
     public static bool SameStableCandidate(string a, string b)
@@ -151,7 +164,8 @@ public static class LiveTextMerger
         if (length < 8) return 0;
         if (length < 16) return 1;
         if (length < 32) return 2;
-        return 3;
+        if (length < 64) return 3;
+        return 4;
     }
 
     private static int FindFuzzyLast(string haystack, string needle, int maxErrors)
@@ -165,6 +179,8 @@ public static class LiveTextMerger
             for (var j = 0; j < needle.Length; j++)
             {
                 if (haystack[i + j] == needle[j])
+                    continue;
+                if (OCR.OcrTextCleanup.SameLetterIgnoreUmlaut(haystack[i + j], needle[j]))
                     continue;
                 errors++;
                 if (errors > maxErrors)
@@ -203,6 +219,8 @@ public static class LiveTextMerger
             for (var j = 0; j < length; j++)
             {
                 if (left[leftStart + j] == right[j])
+                    continue;
+                if (OCR.OcrTextCleanup.SameLetterIgnoreUmlaut(left[leftStart + j], right[j]))
                     continue;
                 errors++;
                 if (errors > maxErrors)

@@ -1,0 +1,45 @@
+Auto Input Tester – Sofort starten (kein Install noetig)
+=======================================================
+
+Voraussetzung
+-------------
+- Windows 10 oder 11 (64-Bit)
+- Microsoft Edge (ist bei Windows meist schon drauf)
+  ODER Google Chrome
+- KEIN .NET, kein Visual Studio, kein SDK noetig
+
+
+Start (3 Schritte)
+------------------
+1. Eine der beiden Dateien doppelklicken:
+   - starten-edge-typewriter.bat     (Microsoft Edge)
+   - starten-chrome-typewriter.bat   (Google Chrome – gleichwertig)
+   Beide funktionieren; nicht beide gleichzeitig starten.
+
+2. Im Browser: auf edu.typewriter.at einloggen und
+   eine Lektion / Uebung starten (Text muss sichtbar sein).
+
+3. AutoInputTester.exe starten
+   -> Browser-Fenster anklicken
+   -> Start:  Ctrl+Shift+F9
+   -> Stop:   Ctrl+Shift+F11
+
+
+Wenn Windows die EXE blockiert (SmartScreen)
+--------------------------------------------
+"Weitere Informationen" -> "Trotzdem ausfuehren"
+
+
+Wichtig
+-------
+- Nur den Browser aus der .bat nutzen (nicht ein normales
+  Edge/Chrome, das du vorher schon offen hattest).
+- Edge und Chrome nicht gleichzeitig mit der .bat starten.
+- Tray-Icon unten rechts: Status "DOM-Text ... Zeichen" = gut.
+
+
+Probleme
+--------
+- "DOM nicht erreichbar": Browser wirklich ueber die .bat
+  gestartet? Alle anderen Edge/Chrome-Fenster vorher schliessen.
+- Nichts passiert: Browser-Fenster fokussieren, dann Hotkey.

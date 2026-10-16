@@ -10,20 +10,48 @@ public sealed class HotkeyReleaseGuard
         var keys = ParseVirtualKeys(hotkey);
         AddCommonModifiers(keys);
 
-        while (keys.Any(IsDown))
+        var deadline = Environment.TickCount64 + 3000;
+        while (keys.Any(IsDown) && Environment.TickCount64 < deadline)
             await Task.Delay(12, token);
 
-        // A tiny settling time avoids the first injected key being combined with
-        // the just-released shortcut on slower systems.
         await Task.Delay(35, token);
     }
 
+    /// <summary>
+    /// Waits until modifiers / manual keys are up (lock-toggle or user typing).
+    /// Never leaves the run permanently paused — only a short settle, then continue.
+    /// </summary>
     public async Task WaitForUserModifiersReleasedAsync(CancellationToken token)
     {
-        var keys = new HashSet<int>();
-        AddCommonModifiers(keys);
-        while (keys.Any(IsDown))
-            await Task.Delay(12, token);
+        var deadline = Environment.TickCount64 + 2500;
+        var sawDown = false;
+
+        while (Environment.TickCount64 < deadline)
+        {
+            if (!AnyUserKeyDown())
+            {
+                if (sawDown)
+                    await Task.Delay(150, token);
+                return;
+            }
+
+            sawDown = true;
+            await Task.Delay(15, token);
+        }
+
+        // Timed out — continue typing anyway.
+        await Task.Delay(50, token);
+    }
+
+    private static bool AnyUserKeyDown()
+    {
+        // Only modifiers — not A–Z. GetAsyncKeyState also sees our own SendInput
+        // letters and would stall typing after every character.
+        return IsDown(VK_SHIFT) || IsDown(VK_CONTROL) || IsDown(VK_MENU) ||
+               IsDown(VK_LWIN) || IsDown(VK_RWIN) ||
+               IsDown(VK_LSHIFT) || IsDown(VK_RSHIFT) ||
+               IsDown(VK_LCONTROL) || IsDown(VK_RCONTROL) ||
+               IsDown(VK_LMENU) || IsDown(VK_RMENU);
     }
 
     private static HashSet<int> ParseVirtualKeys(string text)
@@ -88,6 +116,12 @@ public sealed class HotkeyReleaseGuard
     private const int VK_MENU = 0x12;
     private const int VK_LWIN = 0x5B;
     private const int VK_RWIN = 0x5C;
+    private const int VK_LSHIFT = 0xA0;
+    private const int VK_RSHIFT = 0xA1;
+    private const int VK_LCONTROL = 0xA2;
+    private const int VK_RCONTROL = 0xA3;
+    private const int VK_LMENU = 0xA4;
+    private const int VK_RMENU = 0xA5;
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);

@@ -1,6 +1,27 @@
 Auto Input Tester V6 – Ordner weitergeben
 ========================================
 
+Fuer frische PCs (EMPFOHLEN – kein .NET noetig)
+----------------------------------------------
+1. Bei dir: fertigen-zum-teilen.bat doppelklicken
+2. Weitergeben: Desktop\AutoInputTester_FERTIG.zip
+   Inhalt: EXE + Edge/Chrome-BAT + SO-STARTEN.txt
+3. Empfaenger: ZIP entpacken, SO-STARTEN.txt lesen
+   Braucht nur Windows 10/11 + Edge (meist schon da).
+
+
+Empfohlen vor Ort (Typewriter EDU, exakter DOM-Text)
+----------------------------------------------------
+1. Browser mit Debugging starten (eine der beiden):
+   - starten-edge-typewriter.bat   (Microsoft Edge)
+   - starten-chrome-typewriter.bat (Google Chrome)
+   Beide oeffnen https://edu.typewriter.at (Port 9222)
+2. Einloggen, Lektion starten
+3. AutoInputTester.exe starten
+4. Browser-Fenster fokussieren, Start-Hotkey
+   Hinweis: Edge und Chrome nicht gleichzeitig mit Port 9222 nutzen.
+
+
 Variante A (einfachste): Nur die fertige EXE teilen
 ---------------------------------------------------
 1. Bei dir: build.bat starten

@@ -14,7 +14,7 @@ if exist "%OUTDIR%" rmdir /s /q "%OUTDIR%"
 mkdir "%OUTDIR%" || goto :fail
 
 echo Kopiere Quellcode ohne bin/obj/publish ...
-robocopy "%cd%" "%OUTDIR%" /E /XD bin obj publish .vs AutoInputTester_FIXED_V6 /XF *.user *.suo /NFL /NDL /NJH /NJS /nc /ns /np
+robocopy "%cd%" "%OUTDIR%" /E /XD bin obj publish publish_fix publish_new publish_oe publish_oe2 .vs AutoInputTester_FIXED_V6 /XF *.user *.suo /NFL /NDL /NJH /NJS /nc /ns /np
 if errorlevel 8 goto :fail
 
 if exist "%ZIP%" del /f /q "%ZIP%"

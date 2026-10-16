@@ -7,6 +7,8 @@ namespace AutoInputTester.OCR;
 
 public static class ImagePreprocessor
 {
+    private const int MaxOcrWidth = 1400;
+
     public static Bitmap Prepare(Bitmap source, OcrReadMode mode)
     {
         var prepared = mode switch
@@ -16,62 +18,156 @@ public static class ImagePreprocessor
             _ => new Bitmap(source)
         };
 
-        // Upscale + hard binarize markedly improves thin glyphs (f/j/1/l) and spaces
-        // for Windows OCR on typewriter-style fonts.
         using (prepared)
             return EnhanceForOcr(prepared);
     }
 
     private static Bitmap EnhanceForOcr(Bitmap source)
     {
-        var scale = source.Width < 900 ? 3 : 2;
+        // Cap size: previous 3x upscale on wide selections made OCR so slow that
+        // typing appeared frozen while the tray still said "Tippt".
+        // Short lines (OCR-A umlaut dots) need 2x even on wide selections.
+        var scale = source.Width <= 500 || source.Height <= 48 ? 2 : 1;
         var width = Math.Max(1, source.Width * scale);
         var height = Math.Max(1, source.Height * scale);
-        var scaled = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        if (width > MaxOcrWidth)
+        {
+            var factor = MaxOcrWidth / (double)width;
+            width = MaxOcrWidth;
+            height = Math.Max(1, (int)Math.Round(height * factor));
+        }
 
+        var scaled = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(scaled))
         {
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.InterpolationMode = scale > 1 ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.Half;
             g.Clear(Color.White);
             g.DrawImage(source, 0, 0, width, height);
         }
 
-        var result = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        for (var y = 0; y < height; y++)
+        // Soft contrast only — hard binarize destroyed OCR-A diagonals (j/z) and
+        // caused ~14% trainer errors. Windows OCR handles grayscale well.
+        SoftContrastInPlace(scaled);
+        return scaled;
+    }
+
+    private static unsafe void SoftContrastInPlace(Bitmap bitmap)
+    {
+        var data = bitmap.LockBits(
+            new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+            ImageLockMode.ReadWrite,
+            PixelFormat.Format32bppArgb);
+
+        try
         {
-            for (var x = 0; x < width; x++)
+            var stride = data.Stride;
+            var height = data.Height;
+            var width = data.Width;
+            var ptr = (byte*)data.Scan0;
+
+            for (var y = 0; y < height; y++)
             {
-                var c = scaled.GetPixel(x, y);
-                var brightness = (c.R + c.G + c.B) / 3;
-                result.SetPixel(x, y, brightness < 170 ? Color.Black : Color.White);
+                var row = ptr + y * stride;
+                for (var x = 0; x < width; x++)
+                {
+                    var i = x * 4;
+                    var b = row[i];
+                    var gch = row[i + 1];
+                    var r = row[i + 2];
+                    // Push near-white to white, keep mid/dark strokes (j descender, z diagonal).
+                    var brightness = (r + gch + b) / 3;
+                    if (brightness >= 230)
+                    {
+                        row[i] = 255;
+                        row[i + 1] = 255;
+                        row[i + 2] = 255;
+                    }
+                    else if (brightness <= 40)
+                    {
+                        row[i] = 0;
+                        row[i + 1] = 0;
+                        row[i + 2] = 0;
+                    }
+                    else
+                    {
+                        // Mild stretch toward black for ink, preserve anti-alias.
+                        var t = (brightness - 40) / 190.0;
+                        var v = (byte)Math.Clamp((int)Math.Round(255 * Math.Pow(t, 0.85)), 0, 255);
+                        row[i] = v;
+                        row[i + 1] = v;
+                        row[i + 2] = v;
+                    }
+
+                    row[i + 3] = 255;
+                }
             }
         }
-
-        scaled.Dispose();
-        return result;
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
     }
 
     private static Bitmap RemoveColoredText(Bitmap source)
     {
-        var result = new Bitmap(source.Width, source.Height);
+        var result = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(result);
         g.Clear(Color.White);
 
-        for (var y = 0; y < source.Height; y++)
-        {
-            for (var x = 0; x < source.Width; x++)
-            {
-                var c = source.GetPixel(x, y);
-                var max = Math.Max(c.R, Math.Max(c.G, c.B));
-                var min = Math.Min(c.R, Math.Min(c.G, c.B));
-                var chroma = max - min;
-                var brightness = (c.R + c.G + c.B) / 3;
+        var srcData = source.LockBits(
+            new Rectangle(0, 0, source.Width, source.Height),
+            ImageLockMode.ReadOnly,
+            PixelFormat.Format32bppArgb);
+        var dstData = result.LockBits(
+            new Rectangle(0, 0, result.Width, result.Height),
+            ImageLockMode.WriteOnly,
+            PixelFormat.Format32bppArgb);
 
-                // Neutral/dark pixels are retained; strongly colored pixels (e.g. green completed text) disappear.
-                if (brightness < 225 && chroma < 55)
-                    result.SetPixel(x, y, Color.FromArgb(c.A, c.R, c.G, c.B));
+        try
+        {
+            unsafe
+            {
+                var srcPtr = (byte*)srcData.Scan0;
+                var dstPtr = (byte*)dstData.Scan0;
+                for (var y = 0; y < source.Height; y++)
+                {
+                    var srcRow = srcPtr + y * srcData.Stride;
+                    var dstRow = dstPtr + y * dstData.Stride;
+                    for (var x = 0; x < source.Width; x++)
+                    {
+                        var i = x * 4;
+                        var b = srcRow[i];
+                        var gch = srcRow[i + 1];
+                        var r = srcRow[i + 2];
+                        var a = srcRow[i + 3];
+                        var max = Math.Max(r, Math.Max(gch, b));
+                        var min = Math.Min(r, Math.Min(gch, b));
+                        var chroma = max - min;
+                        var brightness = (r + gch + b) / 3;
+
+                        if (brightness < 225 && chroma < 55)
+                        {
+                            dstRow[i] = b;
+                            dstRow[i + 1] = gch;
+                            dstRow[i + 2] = r;
+                            dstRow[i + 3] = a;
+                        }
+                        else
+                        {
+                            dstRow[i] = 255;
+                            dstRow[i + 1] = 255;
+                            dstRow[i + 2] = 255;
+                            dstRow[i + 3] = 255;
+                        }
+                    }
+                }
             }
+        }
+        finally
+        {
+            source.UnlockBits(srcData);
+            result.UnlockBits(dstData);
         }
 
         return result;

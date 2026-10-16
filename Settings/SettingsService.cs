@@ -25,11 +25,30 @@ public sealed class SettingsService
 
             // Non-destructive migration: keep all user values already present in JSON.
             // Missing V6 properties receive AppSettings defaults via the deserializer.
-            if (settings.SettingsVersion < 6)
+            var changed = false;
+            if (settings.SettingsVersion < 7)
             {
-                settings.SettingsVersion = 6;
-                Save(settings);
+                settings.SettingsVersion = 7;
+                settings.UseDomTextSource = true;
+                changed = true;
             }
+
+            // Old default (10) finished live runs while text was still visible.
+            if (settings.LiveOcrEmptyScansToFinish < 15)
+            {
+                settings.LiveOcrEmptyScansToFinish = 25;
+                changed = true;
+            }
+
+            // Ctrl+Alt+Escape is frequently eaten by hooks; migrate to reliable default.
+            if (string.Equals(settings.StopHotkey, "Ctrl+Alt+Escape", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.StopHotkey = "Ctrl+Shift+F11";
+                changed = true;
+            }
+
+            if (changed)
+                Save(settings);
 
             return settings;
         }
@@ -49,7 +68,7 @@ public sealed class SettingsService
 
     public void Save(AppSettings settings)
     {
-        settings.SettingsVersion = 6;
+        settings.SettingsVersion = 7;
         Directory.CreateDirectory(_directory);
         var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(FilePath, json);

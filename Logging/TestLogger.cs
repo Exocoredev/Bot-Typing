@@ -29,6 +29,9 @@ public sealed class TestLogger
         sb.AppendLine($"Live-OCR Durchläufe: {report.LiveOcrRefreshes}");
         sb.AppendLine($"Durch Live-OCR nachgeladene Zeichen: {report.LiveOcrAppendedCharacters}");
         sb.AppendLine($"Live-OCR Ausrichtungsfehler: {report.LiveOcrAlignmentMisses}");
+        sb.AppendLine($"OCR-Konsens Uneinigkeiten: {report.LiveOcrConsensusDisagreements}");
+        sb.AppendLine($"OCR-Konsens verworfene unsichere Zeichen: {report.LiveOcrConsensusDroppedCharacters}");
+        sb.AppendLine($"OCR-Neusynchronisationen: {report.LiveOcrResyncs}");
         sb.AppendLine($"Solltempo: {report.RequestedStrokesPer10Minutes} / 10 min");
         sb.AppendLine($"Isttempo: {report.ActualStrokesPer10Minutes:F1} / 10 min");
         sb.AppendLine($"Dauer: {report.DurationSeconds:F2} s");

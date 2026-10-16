@@ -62,23 +62,28 @@
                 </Grid>
             </GroupBox>
 
-            <GroupBox Header="Fortlaufender Text / Live OCR" Margin="0,0,0,12">
+            <GroupBox Header="Fortlaufender Text / Live OCR / DOM" Margin="0,0,0,12">
                 <Grid Margin="10">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <CheckBox x:Name="LiveOcrCheck" Grid.Row="0" Grid.ColumnSpan="2"
-                              Content="Live OCR aktiv – neu erscheinenden Text automatisch nachladen" Margin="0,4,0,8"/>
-                    <TextBlock Grid.Row="1" Text="Nachladen ab Restpuffer (Zeichen)" VerticalAlignment="Center"/>
-                    <TextBox x:Name="LivePrefetchBox" Grid.Row="1" Grid.Column="1" Margin="8,4"/>
-                    <TextBlock Grid.Row="2" Text="OCR-Abfrageintervall (ms)" VerticalAlignment="Center"/>
-                    <TextBox x:Name="LivePollBox" Grid.Row="2" Grid.Column="1" Margin="8,4"/>
-                    <TextBlock Grid.Row="3" Text="Leere Scans bis 'Fertig'" VerticalAlignment="Center"/>
-                    <TextBox x:Name="LiveEmptyScansBox" Grid.Row="3" Grid.Column="1" Margin="8,4"/>
-                    <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Text="V6 liest den markierten Bereich während des Tippens erneut. Bereits bekannte Zeichen werden überlappend abgeglichen; nur neu rechts auftauchender Text wird angehängt."/>
+                    <CheckBox x:Name="DomTextCheck" Grid.Row="0" Grid.ColumnSpan="2"
+                              Content="Text aus Browser-DOM (Typewriter) – exakt, empfohlen" Margin="0,4,0,4"/>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,8" TextWrapping="Wrap" Foreground="#444"
+                               Text="Edge + edu.typewriter.at: starten-edge-typewriter.bat. Dann sind Ö/jzj/Fließtext exakt – OCR nur Fallback."/>
+                    <CheckBox x:Name="LiveOcrCheck" Grid.Row="2" Grid.ColumnSpan="2"
+                              Content="Live Nachladen aktiv (DOM oder OCR)" Margin="0,4,0,8"/>
+                    <TextBlock Grid.Row="3" Text="Nachladen ab Restpuffer (Zeichen)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LivePrefetchBox" Grid.Row="3" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="4" Text="Abfrageintervall (ms)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LivePollBox" Grid.Row="4" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="5" Text="Leere Scans bis 'Fertig'" VerticalAlignment="Center"/>
+                    <TextBox x:Name="LiveEmptyScansBox" Grid.Row="5" Grid.Column="1" Margin="8,4"/>
+                    <TextBlock Grid.Row="6" Grid.ColumnSpan="2" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="DOM liefert den echten Übungstext aus der Seite. Ohne DOM: OCR des markierten Bereichs."/>
                 </Grid>
             </GroupBox>
 
@@ -118,8 +123,19 @@
                 </Grid>
             </GroupBox>
 
+            <GroupBox Header="Fenster &amp; Popups" Margin="0,0,0,12">
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="ShowBalloonsCheck" Content="Tray-Benachrichtigungen (Balloons) anzeigen" Margin="0,4"/>
+                    <CheckBox x:Name="ShowFinishBalloonCheck" Content="Balloon am Ende eines Testlaufs anzeigen" Margin="0,4"/>
+                    <CheckBox x:Name="ShowOcrPreviewCheck" Content="OCR-Vorschaufenster nach Bereichsauswahl anzeigen" Margin="0,4"/>
+                    <CheckBox x:Name="ShowErrorDialogsCheck" Content="Fehler-Dialogfenster (MessageBox) anzeigen" Margin="0,4"/>
+                    <TextBlock Margin="0,10,0,0" TextWrapping="Wrap"
+                               Text="Tastatursperre: Links-Shift + Rechts-Shift ein/aus. Entsperren: a s d f j k l ö + - gleichzeitig. Bei aktiver Sperre zeigt das Tray-Icon eine Kamera."/>
+                </StackPanel>
+            </GroupBox>
+
             <TextBlock Margin="2,0,2,12" TextWrapping="Wrap"
-                       Text="Empfohlen für deine laufende Zeile: Live OCR AN, OCR-Modus 'nur schwarzer Text', Restpuffer 45, Intervall 220 ms, 10 leere Scans."/>
+                       Text="Empfohlen für deine laufende Zeile: Live OCR AN, OCR-Modus 'nur schwarzer Text', Restpuffer 45, Intervall 220 ms, 25 leere Scans."/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Abbrechen" Width="100" Margin="4" IsCancel="True"/>

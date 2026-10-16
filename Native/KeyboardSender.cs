@@ -24,6 +24,15 @@ public sealed class KeyboardSender
         // Shift/Ctrl/Alt are a common cause of "random" wrong letters in trainers.
         ReleaseModifiers();
 
+        // German umlauts: VkKeyScanEx for active layout, then fixed DE OEM map, else Unicode.
+        if (IsGermanUmlaut(ch))
+        {
+            if (TrySendPhysicalCharacter(ch, layout) || TrySendGermanUmlaut(ch, layout))
+                return;
+            SendUnicode(ch);
+            return;
+        }
+
         if (!TrySendPhysicalCharacter(ch, layout))
             SendUnicode(ch);
     }
@@ -121,6 +130,37 @@ public sealed class KeyboardSender
             or VK_PRIOR or VK_NEXT or VK_LEFT or VK_RIGHT or VK_UP or VK_DOWN;
     }
 
+    private static bool IsGermanUmlaut(char ch) =>
+        ch is 'ä' or 'ö' or 'ü' or 'Ä' or 'Ö' or 'Ü' or 'ß';
+
+    /// <summary>
+    /// DE-DE OEM mapping: ö=OEM_3, ü=OEM_1, ä=OEM_7, ß=OEM_4.
+    /// </summary>
+    private static bool TrySendGermanUmlaut(char ch, IntPtr layout)
+    {
+        ushort vk;
+        var shift = false;
+        switch (ch)
+        {
+            case 'ö': vk = VK_OEM_3; break;
+            case 'Ö': vk = VK_OEM_3; shift = true; break;
+            case 'ü': vk = VK_OEM_1; break;
+            case 'Ü': vk = VK_OEM_1; shift = true; break;
+            case 'ä': vk = VK_OEM_7; break;
+            case 'Ä': vk = VK_OEM_7; shift = true; break;
+            case 'ß': vk = VK_OEM_4; break;
+            default: return false;
+        }
+
+        var inputs = new List<INPUT>(6);
+        if (shift) AddKey(inputs, VK_LSHIFT, layout, keyUp: false);
+        AddKey(inputs, vk, layout, keyUp: false);
+        AddKey(inputs, vk, layout, keyUp: true);
+        if (shift) AddKey(inputs, VK_LSHIFT, layout, keyUp: true);
+        EnsureSent(inputs.ToArray());
+        return true;
+    }
+
     private static void SendUnicode(char ch)
     {
         var inputs = new INPUT[2];
@@ -171,6 +211,10 @@ public sealed class KeyboardSender
     private const ushort VK_RCONTROL = 0xA3;
     private const ushort VK_LMENU = 0xA4;
     private const ushort VK_RMENU = 0xA5;
+    private const ushort VK_OEM_1 = 0xBA; // ü
+    private const ushort VK_OEM_3 = 0xC0; // ö
+    private const ushort VK_OEM_4 = 0xDB; // ß
+    private const ushort VK_OEM_7 = 0xDE; // ä
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT

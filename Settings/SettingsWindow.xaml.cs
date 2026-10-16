@@ -29,6 +29,7 @@ public partial class SettingsWindow : Window
         LanguageBox.Text = s.OcrLanguageTag;
         SpacesCheck.IsChecked = s.KeepSpaces;
         LineBreaksCheck.IsChecked = s.KeepLineBreaks;
+        DomTextCheck.IsChecked = s.UseDomTextSource;
         LiveOcrCheck.IsChecked = s.LiveOcrEnabled;
         LivePrefetchBox.Text = s.LiveOcrPrefetchCharacters.ToString(CultureInfo.InvariantCulture);
         LivePollBox.Text = s.LiveOcrPollIntervalMilliseconds.ToString(CultureInfo.InvariantCulture);
@@ -39,6 +40,10 @@ public partial class SettingsWindow : Window
         StopHotkeyBox.Text = s.StopHotkey;
         SeedBox.Text = s.RandomSeed.ToString(CultureInfo.InvariantCulture);
         FocusTimeoutBox.Text = s.FocusRestoreTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture);
+        ShowBalloonsCheck.IsChecked = s.ShowTrayBalloons;
+        ShowFinishBalloonCheck.IsChecked = s.ShowFinishBalloon;
+        ShowOcrPreviewCheck.IsChecked = s.ShowOcrPreviewWindow;
+        ShowErrorDialogsCheck.IsChecked = s.ShowErrorDialogs;
 
         SelectCombo(CorrectionCombo, s.CorrectionMode.ToString());
         SelectCombo(OcrModeCombo, s.OcrMode.ToString());
@@ -88,9 +93,9 @@ public partial class SettingsWindow : Window
         {
             System.Windows.MessageBox.Show("Live-OCR Intervall muss zwischen 80 und 5000 ms liegen."); return;
         }
-        if (!int.TryParse(LiveEmptyScansBox.Text, out var emptyScans) || emptyScans < 2 || emptyScans > 100)
+        if (!int.TryParse(LiveEmptyScansBox.Text, out var emptyScans) || emptyScans < 15 || emptyScans > 100)
         {
-            System.Windows.MessageBox.Show("Leere Live-OCR Scans müssen zwischen 2 und 100 liegen."); return;
+            System.Windows.MessageBox.Show("Leere Live-OCR Scans müssen zwischen 15 und 100 liegen (sonst endet der Lauf zu früh)."); return;
         }
         if (!int.TryParse(SeedBox.Text, out var seed) || seed < 0)
         {
@@ -115,7 +120,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        Result.SettingsVersion = 6;
+        Result.SettingsVersion = 7;
         Result.StrokesPer10Minutes = strokes;
         Result.SpeedVariationPercent = variation;
         Result.StartDelayMilliseconds = startDelay;
@@ -126,6 +131,7 @@ public partial class SettingsWindow : Window
         Result.OcrLanguageTag = string.IsNullOrWhiteSpace(LanguageBox.Text) ? "de-DE" : LanguageBox.Text.Trim();
         Result.KeepSpaces = SpacesCheck.IsChecked == true;
         Result.KeepLineBreaks = LineBreaksCheck.IsChecked == true;
+        Result.UseDomTextSource = DomTextCheck.IsChecked == true;
         Result.LiveOcrEnabled = LiveOcrCheck.IsChecked == true;
         Result.LiveOcrPrefetchCharacters = livePrefetch;
         Result.LiveOcrPollIntervalMilliseconds = livePoll;
@@ -140,13 +146,17 @@ public partial class SettingsWindow : Window
         Result.CorrectionMode = Enum.Parse<CorrectionMode>(((ComboBoxItem)CorrectionCombo.SelectedItem).Tag!.ToString()!);
         Result.OcrMode = Enum.Parse<OcrReadMode>(((ComboBoxItem)OcrModeCombo.SelectedItem).Tag!.ToString()!);
         Result.FocusMode = Enum.Parse<FocusMode>(((ComboBoxItem)FocusModeCombo.SelectedItem).Tag!.ToString()!);
+        Result.ShowTrayBalloons = ShowBalloonsCheck.IsChecked == true;
+        Result.ShowFinishBalloon = ShowFinishBalloonCheck.IsChecked == true;
+        Result.ShowOcrPreviewWindow = ShowOcrPreviewCheck.IsChecked == true;
+        Result.ShowErrorDialogs = ShowErrorDialogsCheck.IsChecked == true;
 
         DialogResult = true;
     }
 
     private static AppSettings Clone(AppSettings s) => new()
     {
-        SettingsVersion = 6,
+        SettingsVersion = 7,
         StrokesPer10Minutes = s.StrokesPer10Minutes,
         SpeedVariationPercent = s.SpeedVariationPercent,
         StartDelayMilliseconds = s.StartDelayMilliseconds,
@@ -163,6 +173,8 @@ public partial class SettingsWindow : Window
         LiveOcrPrefetchCharacters = s.LiveOcrPrefetchCharacters,
         LiveOcrPollIntervalMilliseconds = s.LiveOcrPollIntervalMilliseconds,
         LiveOcrEmptyScansToFinish = s.LiveOcrEmptyScansToFinish,
+        UseDomTextSource = s.UseDomTextSource,
+        DomDebugPort = s.DomDebugPort,
         SelectHotkey = s.SelectHotkey,
         StartHotkey = s.StartHotkey,
         PauseHotkey = s.PauseHotkey,
@@ -170,6 +182,10 @@ public partial class SettingsWindow : Window
         FocusMode = s.FocusMode,
         FocusRestoreTimeoutMilliseconds = s.FocusRestoreTimeoutMilliseconds,
         RefreshOcrOnStart = false,
-        RandomSeed = s.RandomSeed
+        RandomSeed = s.RandomSeed,
+        ShowTrayBalloons = s.ShowTrayBalloons,
+        ShowFinishBalloon = s.ShowFinishBalloon,
+        ShowOcrPreviewWindow = s.ShowOcrPreviewWindow,
+        ShowErrorDialogs = s.ShowErrorDialogs
     };
 }

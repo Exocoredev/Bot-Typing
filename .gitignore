@@ -2,6 +2,8 @@
 [Bb]in/
 [Oo]bj/
 [Pp]ublish/
+publish_*/
+
 [Dd]ebug/
 [Rr]elease/
 artifacts/
@@ -80,8 +82,12 @@ appsettings.*.local.json
 
 # Old nested duplicate copies / share leftovers
 AutoInputTester_FIXED_V6/
+AutoInputTester_FERTIG/
 *_SHARE.zip
+*_FERTIG.zip
 *.zip
+# Never commit a loose EXE sitting in the project root
+/AutoInputTester.exe
 
 # Test / temp
 TestResults/

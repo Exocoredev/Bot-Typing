@@ -13,6 +13,9 @@ public sealed class TestRunReport
     public int LiveOcrRefreshes { get; set; }
     public int LiveOcrAppendedCharacters { get; set; }
     public int LiveOcrAlignmentMisses { get; set; }
+    public int LiveOcrConsensusDisagreements { get; set; }
+    public int LiveOcrConsensusDroppedCharacters { get; set; }
+    public int LiveOcrResyncs { get; set; }
     public int RequestedStrokesPer10Minutes { get; set; }
     public int Seed { get; set; }
     public string TargetWindowTitle { get; set; } = string.Empty;

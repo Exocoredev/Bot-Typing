@@ -36,6 +36,10 @@ if not "%DOTNET_MAJOR%"=="8" (
 
 echo Alte Build-Dateien werden entfernt ...
 if exist publish rmdir /s /q publish
+if exist publish_fix rmdir /s /q publish_fix
+if exist publish_new rmdir /s /q publish_new
+if exist publish_oe rmdir /s /q publish_oe
+if exist publish_oe2 rmdir /s /q publish_oe2
 if exist bin rmdir /s /q bin
 if exist obj rmdir /s /q obj
 

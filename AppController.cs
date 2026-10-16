@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Forms;
 using AutoInputTester.Capture;
+using AutoInputTester.Dom;
 using AutoInputTester.Hotkeys;
 using AutoInputTester.Input;
 using AutoInputTester.Logging;
@@ -22,17 +23,22 @@ public sealed class AppController : IDisposable
     private readonly SettingsService _settingsService = new();
     private readonly ScreenCaptureService _capture = new();
     private readonly OcrService _ocr = new();
+    private readonly ChromeDevToolsTextReader _domReader = new();
     private readonly TargetWindowService _target = new();
     private readonly TestLogger _logger = new();
+    private bool _domSourceActive;
 
     private AppSettings _settings = new();
     private TrayManager? _tray;
     private GlobalHotkeyService? _hotkeys;
+    private KeyboardLockService? _keyboardLock;
     private TypingEngine? _typing;
     private string _recognizedText = string.Empty;
     private Rectangle? _selectedRectangle;
     private bool _busySelecting;
     private IntPtr _lastTargetWindow = IntPtr.Zero;
+    private int _consensusDisagreements;
+    private int _consensusDroppedCharacters;
 
     public void Start()
     {
@@ -40,6 +46,7 @@ public sealed class AppController : IDisposable
         _tray = new TrayManager();
         _typing = new TypingEngine(_target);
         _typing.ProgressChanged += OnProgress;
+        _typing.StatusChanged += OnStatus;
 
         _tray.SelectAreaRequested += () => RunAsyncOnUi(SelectAreaAsync);
         _tray.PreviewRequested += () => RunOnUi(ShowPreview);
@@ -78,8 +85,54 @@ public sealed class AppController : IDisposable
             }
         };
 
+        _keyboardLock = new KeyboardLockService();
+        _keyboardLock.LockChanged += locked => RunOnUi(() => OnKeyboardLockChanged(locked));
+        try
+        {
+            _keyboardLock.Start();
+        }
+        catch (Exception ex)
+        {
+            NotifyBalloon("Tastatursperre", ex.Message, ToolTipIcon.Warning);
+        }
+
         RegisterHotkeys();
         _tray.SetStatus("Bereit – Bereich auswählen");
+    }
+
+    private void OnKeyboardLockChanged(bool locked)
+    {
+        _tray?.SetKeyboardLocked(locked);
+        if (locked)
+        {
+            _tray?.SetStatus("Kamera AN – Tastatur gesperrt");
+            NotifyBalloon("Tastatursperre", "Ein. Entsperren: a s d f j k l ö + - gleichzeitig (oder erneut L-Shift+R-Shift).", ToolTipIcon.Info);
+        }
+        else
+        {
+            _tray?.SetStatus("Bereit – Tastatur entsperrt");
+            NotifyBalloon("Tastatursperre", "Aus.", ToolTipIcon.Info);
+        }
+    }
+
+    private void NotifyBalloon(string title, string message, ToolTipIcon icon = ToolTipIcon.Info)
+    {
+        if (!_settings.ShowTrayBalloons) return;
+        _tray?.ShowBalloon(title, message, icon);
+    }
+
+    private void NotifyFinishBalloon(string title, string message)
+    {
+        if (!_settings.ShowTrayBalloons || !_settings.ShowFinishBalloon) return;
+        _tray?.ShowBalloon(title, message);
+    }
+
+    private void NotifyError(string message)
+    {
+        if (_settings.ShowErrorDialogs)
+            System.Windows.MessageBox.Show(message, "Auto Input Tester", MessageBoxButton.OK, MessageBoxImage.Error);
+        else
+            NotifyBalloon("Fehler", message, ToolTipIcon.Error);
     }
 
     private void RegisterHotkeys()
@@ -90,7 +143,7 @@ public sealed class AppController : IDisposable
         }
         catch (Exception ex)
         {
-            _tray?.ShowBalloon("Hotkey-Fehler", ex.Message, ToolTipIcon.Warning);
+            NotifyBalloon("Hotkey-Fehler", ex.Message, ToolTipIcon.Warning);
         }
     }
 
@@ -114,29 +167,37 @@ public sealed class AppController : IDisposable
             _tray?.SetStatus("OCR läuft …");
             await Task.Delay(100);
 
-            using var screenshot = _capture.Capture(rectangle);
-            using var prepared = ImagePreprocessor.Prepare(screenshot, _settings.OcrMode);
-            var text = await _ocr.RecognizeAsync(prepared, _settings.OcrLanguageTag);
-            text = NormalizeRecognizedText(text);
+            var text = await CaptureOcrConsensusAsync(rectangle, CancellationToken.None);
 
-            var preview = new PreviewWindow(text);
-            if (preview.ShowDialog() == true)
+            if (_settings.ShowOcrPreviewWindow)
             {
-                _recognizedText = NormalizeRecognizedText(preview.ResultText);
-                _tray?.SetStatus($"Bereit – {_recognizedText.Length} Zeichen");
-                _tray?.ShowBalloon(
-                    "OCR übernommen",
-                    $"{_recognizedText.Length} Zeichen. Jetzt das Zielfenster anklicken und {_settings.StartHotkey} drücken.");
+                var preview = new PreviewWindow(text);
+                if (preview.ShowDialog() == true)
+                {
+                    _recognizedText = NormalizeRecognizedText(preview.ResultText);
+                    _tray?.SetStatus($"Bereit – {_recognizedText.Length} Zeichen");
+                    NotifyBalloon(
+                        "OCR übernommen",
+                        $"{_recognizedText.Length} Zeichen. Jetzt das Zielfenster anklicken und {_settings.StartHotkey} drücken.");
+                }
+                else
+                {
+                    _tray?.SetStatus("OCR-Vorschau verworfen");
+                }
             }
             else
             {
-                _tray?.SetStatus("OCR-Vorschau verworfen");
+                _recognizedText = NormalizeRecognizedText(text);
+                _tray?.SetStatus($"Bereit – {_recognizedText.Length} Zeichen");
+                NotifyBalloon(
+                    "OCR übernommen",
+                    $"{_recognizedText.Length} Zeichen (ohne Vorschau). {_settings.StartHotkey} zum Start.");
             }
         }
         catch (Exception ex)
         {
             _tray?.SetStatus("OCR-Fehler");
-            System.Windows.MessageBox.Show(ex.Message, "Auto Input Tester", MessageBoxButton.OK, MessageBoxImage.Error);
+            NotifyError(ex.Message);
         }
         finally
         {
@@ -148,7 +209,13 @@ public sealed class AppController : IDisposable
     {
         if (string.IsNullOrEmpty(_recognizedText))
         {
-            _tray?.ShowBalloon("Keine OCR-Daten", "Zuerst einen Bereich auswählen.", ToolTipIcon.Warning);
+            NotifyBalloon("Keine OCR-Daten", "Zuerst einen Bereich auswählen.", ToolTipIcon.Warning);
+            return;
+        }
+
+        if (!_settings.ShowOcrPreviewWindow)
+        {
+            _tray?.SetStatus($"Bereit – {_recognizedText.Length} Zeichen");
             return;
         }
 
@@ -164,7 +231,7 @@ public sealed class AppController : IDisposable
     {
         if (_lastTargetWindow == IntPtr.Zero || !_target.IsAlive(_lastTargetWindow))
         {
-            _tray?.ShowBalloon(
+            NotifyBalloon(
                 "Kein Zielfenster gespeichert",
                 $"Für einen sicheren Start zuerst das Zielfenster aktivieren und {_settings.StartHotkey} benutzen.",
                 ToolTipIcon.Warning);
@@ -180,7 +247,7 @@ public sealed class AppController : IDisposable
 
         if (targetWindow == IntPtr.Zero || !_target.IsAlive(targetWindow))
         {
-            _tray?.ShowBalloon("Kein Zielfenster", "Das Zielfenster konnte nicht erfasst werden.", ToolTipIcon.Warning);
+            NotifyBalloon("Kein Zielfenster", "Das Zielfenster konnte nicht erfasst werden.", ToolTipIcon.Warning);
             return;
         }
 
@@ -190,22 +257,44 @@ public sealed class AppController : IDisposable
         try
         {
             TestRunReport report;
+            _consensusDisagreements = 0;
+            _consensusDroppedCharacters = 0;
 
             if (_settings.LiveOcrEnabled)
             {
-                if (_selectedRectangle is not Rectangle liveRectangle)
+                _domSourceActive = false;
+                if (_settings.UseDomTextSource)
                 {
-                    _tray?.ShowBalloon("Kein Bereich", "Für Live OCR zuerst einen Bildschirmbereich auswählen.", ToolTipIcon.Warning);
+                    var domProbe = await _domReader.TryReadTypewriterRemainingAsync(CancellationToken.None);
+                    if (!string.IsNullOrEmpty(domProbe))
+                    {
+                        _domSourceActive = true;
+                        _recognizedText = NormalizeRecognizedText(domProbe);
+                        NotifyBalloon("DOM-Text", $"{_recognizedText.Length} Zeichen aus Browser gelesen (exakt).", ToolTipIcon.Info);
+                    }
+                    else
+                    {
+                        NotifyBalloon(
+                            "DOM nicht erreichbar",
+                            "Edge mit starten-edge-typewriter.bat öffnen (edu.typewriter.at). Fallback: OCR.",
+                            ToolTipIcon.Warning);
+                    }
+                }
+
+                if (!_domSourceActive && _selectedRectangle is null)
+                {
+                    NotifyBalloon("Kein Bereich", "Für OCR zuerst einen Bildschirmbereich auswählen (oder DOM per BAT nutzen).", ToolTipIcon.Warning);
                     return;
                 }
 
-                _tray?.SetStatus($"Live-Start: {title}");
+                var liveRectangle = _selectedRectangle ?? Rectangle.Empty;
+                _tray?.SetStatus(_domSourceActive ? $"DOM-Start: {title}" : $"Live-OCR: {title}");
                 report = await _typing.StartContinuousAsync(
                     _recognizedText,
                     _settings,
                     targetWindow,
                     title,
-                    token => ReadLiveOcrAsync(liveRectangle, token));
+                    token => ReadLiveTextAsync(liveRectangle, token));
             }
             else
             {
@@ -214,19 +303,16 @@ public sealed class AppController : IDisposable
                 {
                     if (_selectedRectangle is not Rectangle rectangle)
                     {
-                        _tray?.ShowBalloon("Kein Bereich", "Zuerst einen Bildschirmbereich auswählen.", ToolTipIcon.Warning);
+                        NotifyBalloon("Kein Bereich", "Zuerst einen Bildschirmbereich auswählen.", ToolTipIcon.Warning);
                         return;
                     }
 
                     _tray?.SetStatus("OCR aktualisieren …");
-                    using var screenshot = _capture.Capture(rectangle);
-                    using var prepared = ImagePreprocessor.Prepare(screenshot, _settings.OcrMode);
-                    var freshText = await _ocr.RecognizeAsync(prepared, _settings.OcrLanguageTag);
-                    freshText = NormalizeRecognizedText(freshText);
+                    var freshText = await CaptureOcrConsensusAsync(rectangle, CancellationToken.None);
 
                     if (string.IsNullOrEmpty(freshText))
                     {
-                        _tray?.ShowBalloon("OCR leer", "Im gespeicherten Bereich wurde kein Text erkannt.", ToolTipIcon.Warning);
+                        NotifyBalloon("OCR leer", "Im gespeicherten Bereich wurde kein Text erkannt.", ToolTipIcon.Warning);
                         return;
                     }
 
@@ -235,7 +321,7 @@ public sealed class AppController : IDisposable
 
                 if (string.IsNullOrEmpty(_recognizedText))
                 {
-                    _tray?.ShowBalloon("Kein Text", "Zuerst einen Bereich auswählen und OCR übernehmen.", ToolTipIcon.Warning);
+                    NotifyBalloon("Kein Text", "Zuerst einen Bereich auswählen und OCR übernehmen.", ToolTipIcon.Warning);
                     return;
                 }
 
@@ -243,33 +329,71 @@ public sealed class AppController : IDisposable
                 report = await _typing.StartAsync(_recognizedText, _settings, targetWindow, title);
             }
 
+            report.LiveOcrConsensusDisagreements = _consensusDisagreements;
+            report.LiveOcrConsensusDroppedCharacters = _consensusDroppedCharacters;
             _logger.Save(report);
 
             _tray?.SetStatus(report.StopReason == "Completed" ? "Fertig" : report.StopReason);
-            _tray?.ShowBalloon(
+            NotifyFinishBalloon(
                 "Testlauf beendet",
                 $"{report.StopReason}\n{report.TypedCharacters} Zeichen · {report.SentKeyEvents} Tasten · Live-OCR: {report.LiveOcrRefreshes}");
         }
         catch (Exception ex)
         {
             _tray?.SetStatus("Fehler");
-            _tray?.ShowBalloon("Eingabefehler", ex.Message, ToolTipIcon.Error);
+            NotifyBalloon("Eingabefehler", ex.Message, ToolTipIcon.Error);
         }
     }
 
-    private Task<string> ReadLiveOcrAsync(Rectangle rectangle, CancellationToken token)
+    private Task<string> ReadLiveTextAsync(Rectangle rectangle, CancellationToken token)
     {
-        // Run capture + preprocessing + OCR away from the UI/typing continuation.
-        // No window is shown and the browser keeps focus.
         return Task.Run(async () =>
         {
-            token.ThrowIfCancellationRequested();
-            using var screenshot = _capture.Capture(rectangle);
-            using var prepared = ImagePreprocessor.Prepare(screenshot, _settings.OcrMode);
-            var text = await _ocr.RecognizeAsync(prepared, _settings.OcrLanguageTag);
-            token.ThrowIfCancellationRequested();
-            return NormalizeRecognizedText(text);
+            if (_settings.UseDomTextSource)
+            {
+                var dom = await _domReader.TryReadTypewriterRemainingAsync(token).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(dom))
+                {
+                    _domSourceActive = true;
+                    return LiveTextMarkers.MarkDomRemaining(NormalizeRecognizedText(dom));
+                }
+            }
+
+            if (rectangle.Width < 2 || rectangle.Height < 2)
+                return string.Empty;
+
+            // OCR fallback: consensus of two captures.
+            return await CaptureOcrConsensusAsync(rectangle, token).ConfigureAwait(false);
         }, token);
+    }
+
+    private async Task<string> CaptureOcrConsensusAsync(Rectangle rectangle, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var first = await CaptureOcrOnceAsync(rectangle, token);
+        token.ThrowIfCancellationRequested();
+        await Task.Delay(45, token);
+        token.ThrowIfCancellationRequested();
+        var second = await CaptureOcrOnceAsync(rectangle, token);
+        token.ThrowIfCancellationRequested();
+
+        var agreed = OcrConsensus.Agree(first, second);
+        if (agreed.HadDisagreement)
+        {
+            Interlocked.Increment(ref _consensusDisagreements);
+            Interlocked.Add(ref _consensusDroppedCharacters, agreed.DroppedCharacters);
+        }
+
+        return agreed.Text;
+    }
+
+    private async Task<string> CaptureOcrOnceAsync(Rectangle rectangle, CancellationToken token)
+    {
+        using var screenshot = _capture.Capture(rectangle);
+        using var prepared = ImagePreprocessor.Prepare(screenshot, _settings.OcrMode);
+        var text = await _ocr.RecognizeAsync(prepared, _settings.OcrLanguageTag);
+        token.ThrowIfCancellationRequested();
+        return NormalizeRecognizedText(text);
     }
 
     private string NormalizeRecognizedText(string text)
@@ -294,6 +418,8 @@ public sealed class AppController : IDisposable
     private void StopTyping()
     {
         _typing?.Stop();
+        if (_keyboardLock?.IsLocked == true)
+            _keyboardLock.SetLocked(false);
         _tray?.SetStatus("Gestoppt");
     }
 
@@ -301,6 +427,12 @@ public sealed class AppController : IDisposable
     {
         System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
             _tray?.SetStatus($"Tippt: {current} / {total} erkannt – {sent} Tasten"));
+    }
+
+    private void OnStatus(string message)
+    {
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
+            _tray?.SetStatus(message));
     }
 
     private void ShowSettings()
@@ -321,7 +453,7 @@ public sealed class AppController : IDisposable
         {
             _settings = previous;
             try { RegisterHotkeys(); } catch { }
-            _tray?.ShowBalloon("Hotkey-Fehler", ex.Message, ToolTipIcon.Warning);
+            NotifyBalloon("Hotkey-Fehler", ex.Message, ToolTipIcon.Warning);
             _tray?.SetStatus("Einstellungen nicht übernommen");
         }
     }
@@ -360,6 +492,7 @@ public sealed class AppController : IDisposable
     public void Dispose()
     {
         _typing?.Stop();
+        _keyboardLock?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
     }
